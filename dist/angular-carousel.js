@@ -1,6 +1,6 @@
 /**
  * Angular Carousel - Mobile friendly touch carousel for AngularJS
- * @version v0.2.2 - 2014-04-02
+ * @version v0.2.3 - 2014-06-17
  * @link http://revolunet.github.com/angular-carousel
  * @author Julien Bouquillon <julien@revolunet.com>
  * @license MIT License, http://www.opensource.org/licenses/MIT
@@ -35,13 +35,18 @@ angular.module('angular-carousel')
         if (scope.index < scope.items.length-1) scope.index++;
       };
     },
-    template: '<div class="rn-carousel-controls">' +
-                '<span class="rn-carousel-control rn-carousel-control-prev" ng-click="prev()" ng-if="index > 0"></span>' +
-                '<span class="rn-carousel-control rn-carousel-control-next" ng-click="next()" ng-if="index < items.length - 1"></span>' +
-              '</div>'
+    templateUrl: 'carousel-controls.html'
   };
 }]);
 
+angular.module('angular-carousel').run(['$templateCache', function($templateCache) {
+  $templateCache.put('carousel-controls.html',
+    '<div class="rn-carousel-controls">\n' +
+    '  <span class="rn-carousel-control rn-carousel-control-prev" ng-click="prev()" ng-if="index > 0"></span>\n' +
+    '  <span class="rn-carousel-control rn-carousel-control-next" ng-click="next()" ng-if="index < items.length - 1"></span>\n' +
+    '</div>'
+  );
+}]);
 angular.module('angular-carousel')
 
 .directive('rnCarouselIndicators', [function() {
@@ -52,10 +57,16 @@ angular.module('angular-carousel')
       items: '=',
       index: '='
     },
-    template: '<div class="rn-carousel-indicator">' +
-                '<span ng-repeat="item in items" ng-click="$parent.index=$index" ng-class="{active: $index==$parent.index}"></span>' +
-              '</div>'
+    templateUrl: 'carousel-indicators.html'
   };
+}]);
+
+angular.module('angular-carousel').run(['$templateCache', function($templateCache) {
+  $templateCache.put('carousel-indicators.html',
+      '<div class="rn-carousel-indicator">\n' +
+      ' <span ng-repeat="item in items" ng-click="$parent.index=$index" ng-class="{active: $index==$parent.index}"></span>\n' +
+      '</div>'
+  );
 }]);
 
 (function() {
@@ -125,7 +136,7 @@ angular.module('angular-carousel')
                     carouselId++;
 
                     var containerWidth,
-                        transformProperty,
+                        transformFunc,
                         pressed,
                         startX,
                         amplitude,
@@ -256,11 +267,7 @@ angular.module('angular-carousel')
                         var move = -Math.round(offset);
                         move += (scope.carouselBufferIndex * containerWidth);
 
-                        if(!is3dAvailable) {
-                            carousel[0].style[transformProperty] = 'translate(' + move + 'px, 0)';
-                        } else {
-                            carousel[0].style[transformProperty] = 'translate3d(' + move + 'px, 0, 0)';
-                        }
+                        transformFunc(carousel[0], move);
                     }
 
                     function autoScroll() {
@@ -451,21 +458,11 @@ angular.module('angular-carousel')
                         goToSlide(scope.carouselIndex);
                     }
 
-                    // detect supported CSS property
-                    transformProperty = 'transform';
-                    ['webkit', 'Moz', 'O', 'ms'].every(function (prefix) {
-                        var e = prefix + 'Transform';
-                        if (typeof document.body.style[e] !== 'undefined') {
-                            transformProperty = e;
-                            return false;
-                        }
-                        return true;
-                    });
-
-                    //Detect support of translate3d
-                    function detect3dSupport(){
+                    // Detect CSS support and prepare the setter
+                    transformFunc = (function() {
                         var el = document.createElement('p'),
                         has3d,
+                        has2d,
                         transforms = {
                             'webkitTransform':'-webkit-transform',
                             'OTransform':'-o-transform',
@@ -477,15 +474,29 @@ angular.module('angular-carousel')
                         document.body.insertBefore(el, null);
                         for(var t in transforms){
                             if( el.style[t] !== undefined ){
+                                // Test translate3d
                                 el.style[t] = 'translate3d(1px,1px,1px)';
                                 has3d = window.getComputedStyle(el).getPropertyValue(transforms[t]);
+                                if (has3d !== undefined && has3d.length > 0 && has3d !== "none") {
+                                    return function(node, x) {
+                                      node.style[t] = "translate3d(" + x + "px, 0, 0)";
+                                    };
+                                }
+                                // Test translate
+                                el.style[t] = 'translate(1px,1px)';
+                                has2d = window.getComputedStyle(el).getPropertyValue(transforms[t]);
+                                if (has2d !== undefined && has2d.length > 0 && has2d !== "none") {
+                                    return function(node, x) {
+                                      node.style[t] = "translate(" + x + "px, 0)";
+                                    };
+                                }
                             }
                         }
                         document.body.removeChild(el);
-                        return (has3d !== undefined && has3d.length > 0 && has3d !== "none");
-                    }
-
-                    var is3dAvailable = detect3dSupport();
+                        return function(node, x) {
+                            node.style['left'] = "" + x + "px";
+                        };
+                    })();
 
                     function onOrientationChange() {
                         updateContainerWidth();
