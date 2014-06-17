@@ -391,6 +391,7 @@
                     transformFunc = (function() {
                         var el = document.createElement('p'),
                         has3d,
+                        has2d,
                         transforms = {
                             'webkitTransform':'-webkit-transform',
                             'OTransform':'-o-transform',
