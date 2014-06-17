@@ -65,7 +65,7 @@
                     carouselId++;
 
                     var containerWidth,
-                        transformProperty,
+                        transformFunc,
                         pressed,
                         startX,
                         amplitude,
@@ -196,11 +196,7 @@
                         var move = -Math.round(offset);
                         move += (scope.carouselBufferIndex * containerWidth);
 
-                        if(!is3dAvailable) {
-                            carousel[0].style[transformProperty] = 'translate(' + move + 'px, 0)';
-                        } else {
-                            carousel[0].style[transformProperty] = 'translate3d(' + move + 'px, 0, 0)';
-                        }
+                        transformFunc(carousel[0], move);
                     }
 
                     function autoScroll() {
@@ -391,39 +387,44 @@
                         goToSlide(scope.carouselIndex);
                     }
 
-                    // detect supported CSS property
-                    transformProperty = 'transform';
-                    ['webkit', 'Moz', 'O', 'ms'].every(function (prefix) {
-                        var e = prefix + 'Transform';
-                        if (typeof document.body.style[e] !== 'undefined') {
-                            transformProperty = e;
-                            return false;
-                        }
-                        return true;
-                    });
-
-                    //Detect support of translate3d
-                    function detect3dSupport(){
+                    // Detect CSS support and prepare the setter
+                    transformFunc = (function() {
                         var el = document.createElement('p'),
                         has3d,
                         transforms = {
                             'webkitTransform':'-webkit-transform',
+                            'OTransform':'-o-transform',
                             'msTransform':'-ms-transform',
+                            'MozTransform':'-moz-transform',
                             'transform':'transform'
                         };
                         // Add it to the body to get the computed style
                         document.body.insertBefore(el, null);
                         for(var t in transforms){
                             if( el.style[t] !== undefined ){
+                                // Test translate3d
                                 el.style[t] = 'translate3d(1px,1px,1px)';
                                 has3d = window.getComputedStyle(el).getPropertyValue(transforms[t]);
+                                if (has3d !== undefined && has3d.length > 0 && has3d !== "none") {
+                                    return function(node, x) {
+                                      node.style[t] = "translate3d(" + x + "px, 0, 0)";
+                                    };
+                                }
+                                // Test translate
+                                el.style[t] = 'translate(1px,1px)';
+                                has2d = window.getComputedStyle(el).getPropertyValue(transforms[t]);
+                                if (has2d !== undefined && has2d.length > 0 && has2d !== "none") {
+                                    return function(node, x) {
+                                      node.style[t] = "translate(" + x + "px, 0)";
+                                    };
+                                }
                             }
                         }
                         document.body.removeChild(el);
-                        return (has3d !== undefined && has3d.length > 0 && has3d !== "none");
-                    }
-
-                    var is3dAvailable = detect3dSupport();
+                        return function(node, x) {
+                            node.style['left'] = "" + x + "px";
+                        };
+                    })();
 
                     function onOrientationChange() {
                         updateContainerWidth();
